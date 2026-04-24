@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESAVE Bridge — rag_validation_pipeline.ipynb</title>
+<style>
+/* ── Base tokens ─────────────────────────────────────────────── */
+:root {
+  --bg:#fafaf8;--bg2:#f1efe8;--bg3:#e8e6dc;
+  --fg:#2c2c2a;--fg2:#5f5e5a;--fg3:#888780;
+  --brd:rgba(0,0,0,0.08);--brd2:rgba(0,0,0,0.12);
+  --pass:#0F6E56;--pass-bg:#E1F5EE;--pass-lt:#9FE1CB;
+  --review:#854F0B;--review-bg:#FAEEDA;--review-lt:#FAC775;
+  --fail:#A32D2D;--fail-bg:#FCEBEB;--fail-lt:#F7C1C1;
+  --info:#185FA5;--info-bg:#E6F1FB;
+  --purple:#534AB7;--purple-bg:#EEEDFE;
+  --r:10px;--rs:6px;
+  --mono:'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1a1a18;--bg2:#252523;--bg3:#2c2c2a;
+  --fg:#e8e6dc;--fg2:#b4b2a9;--fg3:#888780;
+  --brd:rgba(255,255,255,0.06);--brd2:rgba(255,255,255,0.10);
+  --pass-bg:#04342C;--review-bg:#412402;--fail-bg:#501313;
+  --info-bg:#042C53;--purple-bg:#26215C;
+}}
+
+/* ── Reset & layout ──────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--sans);background:var(--bg);color:var(--fg);
+  line-height:1.6;padding:28px;max-width:960px;margin:0 auto}
+.wrap{max-width:960px;margin:0 auto}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.hdr{padding:0 0 18px;border-bottom:1px solid var(--brd);margin-bottom:22px}
+.hdr-label{font-size:11px;font-weight:600;letter-spacing:0.08em;
+  text-transform:uppercase;color:var(--pass);margin-bottom:4px}
+.hdr h1{font-size:20px;font-weight:500;line-height:1.3}
+.hdr .meta{font-size:12px;color:var(--fg3);margin-top:5px}
+
+/* ── Stats cards ─────────────────────────────────────────────── */
+.stats{display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap}
+.stat{flex:1;min-width:130px;padding:16px;border-radius:var(--r);
+  background:var(--bg2);border:1px solid var(--brd)}
+.stat-lbl{font-size:10px;color:var(--fg3);text-transform:uppercase;
+  letter-spacing:0.06em;margin-bottom:3px}
+.stat-val{font-size:26px;font-weight:500;line-height:1.1}
+.stat-sub{font-size:11px;color:var(--fg3);margin-top:3px}
+
+/* ── Sections ────────────────────────────────────────────────── */
+.sec{margin-bottom:22px;padding:18px;border-radius:var(--r);
+  background:var(--bg2);border:1px solid var(--brd)}
+.sec h3{font-size:14px;font-weight:500;margin-bottom:12px}
+.sec-div{font-size:15px;font-weight:500;margin:28px 0 14px;
+  padding-top:18px;border-top:1px solid var(--brd)}
+
+/* ── Score bars ──────────────────────────────────────────────── */
+.s-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.s-lbl{width:72px;font-size:11px;color:var(--fg2);text-align:right;flex-shrink:0}
+.s-bar{flex:1;height:7px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.s-fill{height:100%;border-radius:4px;transition:width 0.5s ease}
+.s-val{width:40px;font-size:11px;font-weight:500;text-align:right}
+.legend{display:flex;gap:14px;margin-bottom:12px;font-size:10px;color:var(--fg3);flex-wrap:wrap}
+.leg-i{display:flex;align-items:center;gap:4px}
+.leg-d{width:7px;height:7px;border-radius:2px;display:inline-block}
+
+/* ── Gap cards ───────────────────────────────────────────────── */
+.gap{padding:12px 14px;margin-bottom:8px;border-radius:8px;
+  background:var(--bg);border-left:3px solid}
+.gap.crit{border-left-color:var(--fail)}
+.gap.mod{border-left-color:var(--review)}
+.gap-hdr{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.badge{padding:2px 9px;border-radius:99px;font-size:10px;font-weight:500;
+  display:inline-block;letter-spacing:0.02em}
+.b-crit{background:var(--fail-bg);color:var(--fail)}
+.b-mod{background:var(--review-bg);color:var(--review)}
+.b-pass{background:var(--pass-bg);color:var(--pass)}
+.gap-t{font-size:13px;font-weight:500;margin-bottom:2px}
+.gap-d{font-size:11px;color:var(--fg2);line-height:1.5}
+.gap-r{font-size:11px;color:var(--info);margin-top:3px}
+
+/* ── Tables ──────────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--bg3);padding:8px 12px;text-align:left;font-weight:500;
+  border-bottom:2px solid var(--brd2)}
+td{padding:8px 12px;border-bottom:1px solid var(--brd);color:var(--fg2)}
+tr:hover td{background:var(--bg2)}
+
+/* ── Cell outputs ────────────────────────────────────────────── */
+.c-out{margin-bottom:10px}
+.c-code{padding:10px 12px;border-radius:var(--rs) var(--rs) 0 0;
+  background:var(--bg3);font-family:var(--mono);font-size:10px;line-height:1.5;
+  color:var(--fg3);overflow-x:auto;white-space:pre-wrap;
+  border:1px solid var(--brd);border-bottom:1px dashed var(--brd)}
+.c-text{padding:12px;border-radius:var(--rs);background:var(--bg2);
+  font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--fg2);
+  overflow-x:auto;white-space:pre-wrap;border:1px solid var(--brd)}
+.c-html{overflow:auto;border-radius:var(--rs);border:1px solid var(--brd)}
+.c-html table{margin:0}
+.c-md{padding:8px 12px;border-radius:var(--rs);
+  font-size:13px;font-weight:500;color:var(--fg)}
+.c-err{padding:12px;border-radius:var(--rs);background:var(--fail-bg);
+  font-family:var(--mono);font-size:11px;color:var(--fail);
+  overflow-x:auto;white-space:pre-wrap;border:1px solid var(--fail)}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.pipe{display:flex;gap:14px;flex-wrap:wrap;padding:12px 16px;
+  border-radius:var(--r);font-size:11px;color:var(--fg3);
+  background:var(--bg2);border:1px solid var(--brd);margin-top:22px}
+.ftr{margin-top:16px;padding-top:14px;border-top:1px solid var(--brd);
+  font-size:10px;color:var(--fg3);display:flex;justify-content:space-between;
+  flex-wrap:wrap;gap:6px}
+</style>
+</head>
+<body><div class="wrap">
+<div class="hdr">
+  <div class="hdr-label">ESAVE — Notebook Output Bridge</div>
+  <h1>rag_validation_pipeline.ipynb</h1>
+  <div class="meta">Kernel: Python 3 · Cells: 7 (6 code) · Rendered: 2026-04-21T09:13:41</div>
+</div>
+<div class="stats">
+  <div class="stat"><div class="stat-lbl">Sections</div>
+    <div class="stat-val">12</div>
+    <div class="stat-sub">normative requirements</div></div>
+  <div class="stat"><div class="stat-lbl">Pass</div>
+    <div class="stat-val" style="color:var(--pass)">8</div>
+    <div class="stat-sub">67% pass rate</div></div>
+  <div class="stat"><div class="stat-lbl">Review</div>
+    <div class="stat-val" style="color:var(--review)">2</div>
+    <div class="stat-sub">human review</div></div>
+  <div class="stat"><div class="stat-lbl">Fail</div>
+    <div class="stat-val" style="color:var(--fail)">2</div>
+    <div class="stat-sub">gaps identified</div></div>
+  <div class="stat"><div class="stat-lbl">Mean score</div>
+    <div class="stat-val" style="color:var(--info)">0.834</div>
+    <div class="stat-sub">threshold: 0.85 · coverage: 83%</div></div>
+</div><div class="sec">
+  <h3>Match scores by section</h3>
+  <div class="legend">
+    <span class="leg-i"><span class="leg-d" style="background:var(--pass)"></span>≥0.85 pass</span>
+    <span class="leg-i"><span class="leg-d" style="background:var(--review)"></span>0.70–0.85 review</span>
+    <span class="leg-i"><span class="leg-d" style="background:var(--fail)"></span>&lt;0.70 fail</span>
+  </div>
+  <div class="s-row"><div class="s-lbl">§4.2.1</div><div class="s-bar"><div class="s-fill" style="width:94.0%;background:var(--pass)"></div></div><div class="s-val" style="color:var(--pass)">0.94</div></div><div class="s-row"><div class="s-lbl">§5.1.3</div><div class="s-bar"><div class="s-fill" style="width:91.0%;background:var(--pass)"></div></div><div class="s-val" style="color:var(--pass)">0.91</div></div><div class="s-row"><div class="s-lbl">§5.2.1</div><div class="s-bar"><div class="s-fill" style="width:88.0%;background:var(--pass)"></div></div><div class="s-val" style="color:var(--pass)">0.88</div></div><div class="s-row"><div class="s-lbl">§6.1.2</div><div class="s-bar"><div class="s-fill" style="width:62.0%;background:var(--fail)"></div></div><div class="s-val" style="color:var(--fail)">0.62</div></div><div class="s-row"><div class="s-lbl">§6.3.1</div><div class="s-bar"><div class="s-fill" style="width:87.0%;background:var(--pass)"></div></div><div class="s-val" style="color:var(--pass)">0.87</div></div><div class="s-row"><div class="s-lbl">§7.1.1</div><div class="s-bar"><div class="s-fill" style="width:73.0%;background:var(--review)"></div></div><div class="s-val" style="color:var(--review)">0.73</div></div><div class="s-row"><div class="s-lbl">§7.2.4</div><div class="s-bar"><div class="s-fill" style="width:92.0%;background:var(--pass)"></div></div><div class="s-val" style="color:var(--pass)">0.92</div></div><div class="s-row"><div class="s-lbl">§8.1.1</div><div class="s-bar"><div class="s-fill" style="width:57.99999999999999%;background:var(--fail)"></div></div><div class="s-val" style="color:var(--fail)">0.58</div></div><div class="s-row"><div class="s-lbl">§8.2.3</div><div class="s-bar"><div class="s-fill" style="width:89.0%;background:var(--pass)"></div></div><div class="s-val" style="color:var(--pass)">0.89</div></div><div class="s-row"><div class="s-lbl">§9.1.1</div><div class="s-bar"><div class="s-fill" style="width:96.0%;background:var(--pass)"></div></div><div class="s-val" style="color:var(--pass)">0.96</div></div><div class="s-row"><div class="s-lbl">§9.2.1</div><div class="s-bar"><div class="s-fill" style="width:71.0%;background:var(--review)"></div></div><div class="s-val" style="color:var(--review)">0.71</div></div><div class="s-row"><div class="s-lbl">§10.1.1</div><div class="s-bar"><div class="s-fill" style="width:90.0%;background:var(--pass)"></div></div><div class="s-val" style="color:var(--pass)">0.90</div></div>
+</div><div class="sec">
+  <h3>SQL verification results</h3>
+  <table>
+  <thead><tr><th>Section</th><th>Requirement</th><th>Retrieved</th>
+    <th>Score</th><th>Status</th></tr></thead>
+  <tbody><tr><td>4.2.1</td><td>Transaction Flow</td><td>Yes</td><td>0.94</td><td><span class="badge b-pass">✓ PASS</span></td></tr><tr><td>5.1.3</td><td>Cryptogram Generation</td><td>Yes</td><td>0.91</td><td><span class="badge b-pass">✓ PASS</span></td></tr><tr><td>5.2.1</td><td>Key Derivation</td><td>Yes</td><td>0.88</td><td><span class="badge b-pass">✓ PASS</span></td></tr><tr><td>6.1.2</td><td>ODA Parameters</td><td>No</td><td>0.62</td><td><span class="badge b-crit">✗ FAIL</span></td></tr><tr><td>6.3.1</td><td>CVM Processing</td><td>Yes</td><td>0.87</td><td><span class="badge b-pass">✓ PASS</span></td></tr><tr><td>7.1.1</td><td>Risk Management</td><td>Partial</td><td>0.73</td><td><span class="badge b-mod">⚠ REVIEW</span></td></tr><tr><td>7.2.4</td><td>Floor Limit Check</td><td>Yes</td><td>0.92</td><td><span class="badge b-pass">✓ PASS</span></td></tr><tr><td>8.1.1</td><td>Script Processing</td><td>No</td><td>0.58</td><td><span class="badge b-crit">✗ FAIL</span></td></tr><tr><td>8.2.3</td><td>Issuer Authentication</td><td>Yes</td><td>0.89</td><td><span class="badge b-pass">✓ PASS</span></td></tr><tr><td>9.1.1</td><td>HCE Token Management</td><td>Yes</td><td>0.96</td><td><span class="badge b-pass">✓ PASS</span></td></tr><tr><td>9.2.1</td><td>Lifecycle Events</td><td>Partial</td><td>0.71</td><td><span class="badge b-mod">⚠ REVIEW</span></td></tr><tr><td>10.1.1</td><td>Contactless Limits</td><td>Yes</td><td>0.90</td><td><span class="badge b-pass">✓ PASS</span></td></tr></tbody>
+  </table>
+</div><div class="sec">
+  <h3>Gap analysis — LLM inference</h3>
+  <div class="gap crit"><div class="gap-hdr"><span class="badge b-crit">CRITICAL</span><span style="font-size:11px;color:var(--fg3)">§6.1.2</span></div><div class="gap-t">ODA Parameters Missing</div><div class="gap-d">Offline Data Authentication parameters not retrievable.</div><div class="gap-r">→ Add AIP/AFL configuration table per EMV Book 3 §6.5.</div></div><div class="gap crit"><div class="gap-hdr"><span class="badge b-crit">CRITICAL</span><span style="font-size:11px;color:var(--fg3)">§8.1.1</span></div><div class="gap-t">Script Processing References Absent</div><div class="gap-d">Issuer script processing references missing.</div><div class="gap-r">→ Reference EMV Book 3 §10 and GlobalPlatform Card Specification v2.3.1.</div></div><div class="gap mod"><div class="gap-hdr"><span class="badge b-mod">MODERATE</span><span style="font-size:11px;color:var(--fg3)">§7.1.1</span></div><div class="gap-t">Risk Management Partially Specified</div><div class="gap-d">Terminal risk management parameters partially specified.</div><div class="gap-r">→ Cross-reference EMV Contactless Book C-2 §7.</div></div><div class="gap mod"><div class="gap-hdr"><span class="badge b-mod">MODERATE</span><span style="font-size:11px;color:var(--fg3)">§9.2.1</span></div><div class="gap-t">Lifecycle State Machine Incomplete</div><div class="gap-d">Token lifecycle state machine incomplete.</div><div class="gap-r">→ Align with EMV Payment Tokenisation Specification v2.1 §5.4.</div></div>
+</div><div class="sec-div">Cell outputs</div><div class="c-out"><div class="c-md">RAG Pipeline Validation — EMV Specification Corpus</div></div><div class="c-out"><div class="c-text">Document: dpas_hce_ios_spec_v1.0.pdf
+Extracted 47 pages, 12 tables
+Chunking: 1024 tokens, 128 overlap
+Generated 186 chunks
+Metadata fields: section_id, page_num, table_ref, normative_flag</div></div><div class="c-out"><div class="c-text">Model: mixedbread-ai/mxbai-embed-large-v1
+Embedding shape: (186, 1024)
+Dimensions: 1024
+Similarity metric: cosine
+Index build time: 2.3s
+Embedding generation time: 8.7s</div></div><div class="c-out"><div class="c-text">Section    Requirement               Normative  Retrieved  Score    Status  
+==========================================================================
+4.2.1      Transaction Flow           Yes        Yes        0.94     ✓ PASS
+5.1.3      Cryptogram Generation      Yes        Yes        0.91     ✓ PASS
+5.2.1      Key Derivation             Yes        Yes        0.88     ✓ PASS
+6.1.2      ODA Parameters             Yes        No         0.62     ✗ FAIL
+6.3.1      CVM Processing             Yes        Yes        0.87     ✓ PASS
+7.1.1      Risk Management            Yes        Partial    0.73     ⚠ REVIEW
+7.2.4      Floor Limit Check          Yes        Yes        0.92     ✓ PASS
+8.1.1      Script Processing          Yes        No         0.58     ✗ FAIL
+8.2.3      Issuer Authentication      Yes        Yes        0.89     ✓ PASS
+9.1.1      HCE Token Management       Yes        Yes        0.96     ✓ PASS
+9.2.1      Lifecycle Events            Yes        Partial    0.71     ⚠ REVIEW
+10.1.1     Contactless Limits          Yes        Yes        0.90     ✓ PASS</div></div><div class="c-out"><div class="c-text">╔══════════════════════════════════════════╗
+║  RAG Retrieval Quality Summary           ║
+╠══════════════════════════════════════════╣
+║  Total sections evaluated:    12        ║
+║  Pass  (≥0.85):              8   (66.7%) ║
+║  Review (0.70-0.85):           2   (16.7%) ║
+║  Fail  (&lt;0.70):               2   (16.7%) ║
+║  Mean match score:            0.834      ║
+║  Coverage (retrieved/total):   83.3%     ║
+║  Quality threshold:           0.85       ║
+╚══════════════════════════════════════════╝
+
+
+{
+  &quot;total_sections&quot;: 12,
+  &quot;pass_count&quot;: 8,
+  &quot;review_count&quot;: 2,
+  &quot;fail_count&quot;: 2,
+  &quot;mean_score&quot;: 0.834,
+  &quot;coverage&quot;: 0.833,
+  &quot;threshold&quot;: 0.85,
+  &quot;validation_data&quot;: [
+    {&quot;section_id&quot;: &quot;4.2.1&quot;, &quot;requirement_type&quot;: &quot;Transaction Flow&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Yes&quot;, &quot;match_score&quot;: 0.94, &quot;status&quot;: &quot;PASS&quot;},
+    {&quot;section_id&quot;: &quot;5.1.3&quot;, &quot;requirement_type&quot;: &quot;Cryptogram Generation&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Yes&quot;, &quot;match_score&quot;: 0.91, &quot;status&quot;: &quot;PASS&quot;},
+    {&quot;section_id&quot;: &quot;5.2.1&quot;, &quot;requirement_type&quot;: &quot;Key Derivation&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Yes&quot;, &quot;match_score&quot;: 0.88, &quot;status&quot;: &quot;PASS&quot;},
+    {&quot;section_id&quot;: &quot;6.1.2&quot;, &quot;requirement_type&quot;: &quot;ODA Parameters&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;No&quot;, &quot;match_score&quot;: 0.62, &quot;status&quot;: &quot;FAIL&quot;},
+    {&quot;section_id&quot;: &quot;6.3.1&quot;, &quot;requirement_type&quot;: &quot;CVM Processing&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Yes&quot;, &quot;match_score&quot;: 0.87, &quot;status&quot;: &quot;PASS&quot;},
+    {&quot;section_id&quot;: &quot;7.1.1&quot;, &quot;requirement_type&quot;: &quot;Risk Management&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Partial&quot;, &quot;match_score&quot;: 0.73, &quot;status&quot;: &quot;REVIEW&quot;},
+    {&quot;section_id&quot;: &quot;7.2.4&quot;, &quot;requirement_type&quot;: &quot;Floor Limit Check&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Yes&quot;, &quot;match_score&quot;: 0.92, &quot;status&quot;: &quot;PASS&quot;},
+    {&quot;section_id&quot;: &quot;8.1.1&quot;, &quot;requirement_type&quot;: &quot;Script Processing&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;No&quot;, &quot;match_score&quot;: 0.58, &quot;status&quot;: &quot;FAIL&quot;},
+    {&quot;section_id&quot;: &quot;8.2.3&quot;, &quot;requirement_type&quot;: &quot;Issuer Authentication&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Yes&quot;, &quot;match_score&quot;: 0.89, &quot;status&quot;: &quot;PASS&quot;},
+    {&quot;section_id&quot;: &quot;9.1.1&quot;, &quot;requirement_type&quot;: &quot;HCE Token Management&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Yes&quot;, &quot;match_score&quot;: 0.96, &quot;status&quot;: &quot;PASS&quot;},
+    {&quot;section_id&quot;: &quot;9.2.1&quot;, &quot;requirement_type&quot;: &quot;Lifecycle Events&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Partial&quot;, &quot;match_score&quot;: 0.71, &quot;status&quot;: &quot;REVIEW&quot;},
+    {&quot;section_id&quot;: &quot;10.1.1&quot;, &quot;requirement_type&quot;: &quot;Contactless Limits&quot;, &quot;normative&quot;: &quot;Yes&quot;, &quot;rag_retrieved&quot;: &quot;Yes&quot;, &quot;match_score&quot;: 0.90, &quot;status&quot;: &quot;PASS&quot;}
+  ]
+}</div></div><div class="c-out"><div class="c-text">[Llama 3.1 8B — Gap Analysis]
+Specification: dpas_hce_ios_spec_v1.0.pdf
+Quality threshold: 0.85
+
+1. [CRITICAL] Section 6.1.2 — ODA Parameters Missing
+   Offline Data Authentication parameters not retrievable. The specification lacks explicit mapping of Static/Dynamic Data Authentication data objects for HCE context.
+   → Recommendation: Add AIP/AFL configuration table per EMV Book 3 §6.5.
+
+2. [CRITICAL] Section 8.1.1 — Script Processing References Absent
+   Issuer script processing references missing. No APDU command templates for post-issuance script delivery over OTA channel.
+   → Recommendation: Reference EMV Book 3 §10 and GlobalPlatform Card Specification v2.3.1.
+
+3. [MODERATE] Section 7.1.1 — Risk Management Partially Specified
+   Terminal risk management parameters partially specified but missing velocity checking counters and cumulative limits for contactless transactions.
+   → Recommendation: Cross-reference EMV Contactless Book C-2 §7 for terminal risk management.
+
+4. [MODERATE] Section 9.2.1 — Lifecycle State Machine Incomplete
+   Token lifecycle state machine incomplete. Suspension and resumption triggers not defined for HCE token provisioning.
+   → Recommendation: Align with EMV Payment Tokenisation Specification v2.1 §5.4.
+
+Inference time: 4.2s | Tokens: 487 | Temperature: 0.1
+
+
+[
+  {&quot;severity&quot;: &quot;CRITICAL&quot;, &quot;section&quot;: &quot;6.1.2&quot;, &quot;title&quot;: &quot;ODA Parameters Missing&quot;, &quot;description&quot;: &quot;Offline Data Authentication parameters not retrievable.&quot;, &quot;recommendation&quot;: &quot;Add AIP/AFL configuration table per EMV Book 3 §6.5.&quot;},
+  {&quot;severity&quot;: &quot;CRITICAL&quot;, &quot;section&quot;: &quot;8.1.1&quot;, &quot;title&quot;: &quot;Script Processing References Absent&quot;, &quot;description&quot;: &quot;Issuer script processing references missing.&quot;, &quot;recommendation&quot;: &quot;Reference EMV Book 3 §10 and GlobalPlatform Card Specification v2.3.1.&quot;},
+  {&quot;severity&quot;: &quot;MODERATE&quot;, &quot;section&quot;: &quot;7.1.1&quot;, &quot;title&quot;: &quot;Risk Management Partially Specified&quot;, &quot;description&quot;: &quot;Terminal risk management parameters partially specified.&quot;, &quot;recommendation&quot;: &quot;Cross-reference EMV Contactless Book C-2 §7.&quot;},
+  {&quot;severity&quot;: &quot;MODERATE&quot;, &quot;section&quot;: &quot;9.2.1&quot;, &quot;title&quot;: &quot;Lifecycle State Machine Incomplete&quot;, &quot;description&quot;: &quot;Token lifecycle state machine incomplete.&quot;, &quot;recommendation&quot;: &quot;Align with EMV Payment Tokenisation Specification v2.1 §5.4.&quot;}
+]</div></div>
+<div class="pipe">
+  <span>Notebook: rag_validation_pipeline.ipynb</span>
+  <span>Kernel: Python 3</span>
+  <span>Cells: 7 (6 code)</span>
+  <span>Rendered: 2026-04-21T09:13:41</span>
+</div>
+<div class="ftr">
+  <span>Notebook Output Bridge v3.0 — DTS/ESAVE</span>
+  <span>Local-first · nbparameterise + nbclient + nbformat ·
+    Zero HTTP ports</span>
+</div></div></body></html>
