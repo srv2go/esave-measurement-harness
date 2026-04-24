@@ -1,6 +1,6 @@
 # Notebook Output Bridge v3.0 — Local-First Edition
 
-**DTS/ESAVE Contribution to attempt workaround for the D&A Team**
+**ESAVE Contribution to attempt workaround for extracting results for POC Dashboard offline version**
 
 A lightweight library that executes, parses, and renders Jupyter notebook
 outputs as rich HTML dashboards — entirely local, no server process required.
